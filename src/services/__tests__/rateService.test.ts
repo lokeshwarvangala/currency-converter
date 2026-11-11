@@ -123,6 +123,12 @@ describe('Live Rates & LocalStorage Cache', () => {
     expect(rate).toBe(150.0);
   });
 
+  it('should throw an error when invalid currency code formats are provided', async () => {
+    await expect(fetchLiveRate('../USD', 'EUR')).rejects.toThrow('Invalid currency code');
+    await expect(fetchLiveRate('USD', 'TOOLONG')).rejects.toThrow('Invalid currency code');
+    await expect(fetchLiveRate('123', 'EUR')).rejects.toThrow('Invalid currency code');
+  });
+
   it('should throw a strict error when network fails and no cached data exists', async () => {
     localStorage.clear();
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('Network offline')));
