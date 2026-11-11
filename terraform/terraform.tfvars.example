@@ -1,0 +1,18 @@
+# Application settings
+app_name    = "currency-converter"
+environment = "prod"
+location    = "eastus2"
+
+# Free tier (Zero cost, custom domain support, global CDN)
+sku_tier    = "Free"
+sku_size    = "Free"
+
+# Resource tagging
+tags = {
+  Project     = "CurrencyConverter"
+  ManagedBy   = "Terraform"
+  Environment = "prod"
+}
+
+# Optional custom domain (leave empty to use default *.azurestaticapps.net)
+# custom_domain = "currency.example.com"
