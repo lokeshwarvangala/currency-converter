@@ -9,6 +9,15 @@
 const CACHE_PREFIX = 'currency_rates_';
 const CODES_CACHE_KEY = 'supported_currency_codes';
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
+const CURRENCY_CODE_REGEX = /^[A-Z]{3,4}$/;
+
+function sanitizeCurrencyCode(code: string): string {
+  const clean = code.trim().toUpperCase();
+  if (!CURRENCY_CODE_REGEX.test(clean)) {
+    throw new Error(`Invalid currency code: ${code}`);
+  }
+  return encodeURIComponent(clean);
+}
 
 interface CachedRates {
   rates: Record<string, number>;
@@ -114,14 +123,17 @@ export async function fetchSupportedCurrencyCodes(): Promise<string[]> {
  * and falls back to expired local cache before throwing a strict error.
  */
 export async function fetchLiveRate(fromCode: string, toCode: string): Promise<number> {
-  if (fromCode === toCode) return 1.0;
+  const cleanFrom = sanitizeCurrencyCode(fromCode);
+  const cleanTo = sanitizeCurrencyCode(toCode);
+
+  if (cleanFrom === cleanTo) return 1.0;
 
   const now = Date.now();
-  const cached = getFromStorage(fromCode);
+  const cached = getFromStorage(cleanFrom);
 
   // If cache is valid within 24 hours, return immediately
   if (cached && (now - cached.timestamp < CACHE_TTL_MS)) {
-    const rate = cached.rates[toCode];
+    const rate = cached.rates[cleanTo];
     if (rate !== undefined) {
       return rate;
     }
@@ -132,7 +144,7 @@ export async function fetchLiveRate(fromCode: string, toCode: string): Promise<n
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 7000); // 7s timeout
 
-    const response = await fetch(`https://open.er-api.com/v6/latest/${fromCode}`, {
+    const response = await fetch(`https://open.er-api.com/v6/latest/${cleanFrom}`, {
       signal: controller.signal,
     });
 
@@ -144,19 +156,19 @@ export async function fetchLiveRate(fromCode: string, toCode: string): Promise<n
 
     const data: OpenErApiResponse = await response.json();
     if (data.result === 'success' && data.rates) {
-      saveToStorage(fromCode, data.rates);
-      const rate = data.rates[toCode];
+      saveToStorage(cleanFrom, data.rates);
+      const rate = data.rates[cleanTo];
       if (rate !== undefined) {
         return rate;
       }
-      throw new Error(`Currency ${toCode} not available in market data.`);
+      throw new Error(`Currency ${cleanTo} not available in market data.`);
     }
 
     throw new Error('Unexpected response format from exchange rate provider.');
   } catch (err: unknown) {
     // If network or API fails, check if we have any cached data (even if older than 24h)
-    if (cached && cached.rates[toCode] !== undefined) {
-      return cached.rates[toCode];
+    if (cached && cached.rates[cleanTo] !== undefined) {
+      return cached.rates[cleanTo];
     }
 
     // Strict Error fallback when no cached data exists
